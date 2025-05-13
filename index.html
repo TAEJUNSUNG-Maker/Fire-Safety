@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>분전함 열화상 온도 모니터링</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        .container {
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 400px;
+            padding: 20px;
+        }
+
+        #login-section {
+            text-align: center;
+        }
+
+        #login-section h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        .input-group {
+            margin-bottom: 15px;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            box-sizing: border-box;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 10px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .btn:hover {
+            background-color: #45a049;
+        }
+
+        #error-message {
+            color: red;
+            margin-bottom: 10px;
+        }
+
+        #dashboard {
+            display: none;
+        }
+
+        .dashboard-header {
+            background-color: white;
+            padding: 10px 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+        }
+
+        .logo-circle {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            border: 2px solid #333;
+            display: flex;
+            justify-content: center;
+            flex-direction: column;
+            align-items: center;
+            margin-right: 10px;
+        }
+
+        .logo-circle div {
+            width: 20px;
+            height: 3px;
+            background-color: #333;
+            margin: 2px 0;
+        }
+
+        .main-button {
+            background-color: #1a73e8;
+            color: white;
+            padding: 10px 15px;
+            border-radius: 5px;
+            font-weight: bold;
+            margin: 10px 0;
+            text-align: center;
+        }
+
+        .panels-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-gap: 10px;
+        }
+
+        .panel-card {
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 10px;
+            position: relative;
+            height: 100px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .panel-title {
+            background-color: #333;
+            color: white;
+            padding: 5px 10px;
+            font-size: 12px;
+            border-radius: 3px;
+            margin-bottom: 10px;
+        }
+
+        .temperature {
+            font-size: 28px;
+            font-weight: bold;
+            text-align: center;
+            color: #4285f4;
+        }
+
+        .temperature.warning {
+            color: #fbbc05;
+        }
+
+        .temperature.critical {
+            color: #ea4335;
+        }
+
+        .gauge {
+            position: absolute;
+            right: 10px;
+            top: 40px;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background-color: #f4f4f4;
+            border: 2px solid #333;
+            overflow: hidden;
+        }
+
+        .gauge:before {
+            content: '';
+            position: absolute;
+            top: 5px;
+            left: 5px;
+            right: 5px;
+            bottom: 5px;
+            background: white;
+            border-radius: 50%;
+            z-index: 2;
+        }
+
+        .gauge-needle {
+            position: absolute;
+            width: 2px;
+            height: 16px;
+            background-color: #333;
+            bottom: 20px;
+            left: 19px;
+            transform-origin: bottom center;
+            z-index: 3;
+            transform: rotate(0deg);
+            transition: transform 0.5s ease-out;
+        }
+        
+        .gauge-segments {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+        }
+        
+        .gauge-segment {
+            position: absolute;
+            width: 6px;
+            height: 6px;
+            background-color: #ddd;
+            z-index: 1;
+        }
+        
+        /* Green segments (normal) */
+        .gauge-segment-1 { background-color: #92D050; top: 27px; left: 4px; }
+        .gauge-segment-2 { background-color: #92D050; top: 22px; left: 6px; }
+        .gauge-segment-3 { background-color: #A8CE38; top: 17px; left: 9px; }
+        .gauge-segment-4 { background-color: #B7CD2E; top: 13px; left: 13px; }
+        .gauge-segment-5 { background-color: #C4C528; top: 9px; left: 17px; }
+        
+        /* Yellow segments (warning) */
+        .gauge-segment-6 { background-color: #D1BD22; top: 7px; left: 22px; }
+        .gauge-segment-7 { background-color: #DEB01B; top: 6px; left: 27px; }
+        .gauge-segment-8 { background-color: #E79F18; top: 7px; left: 32px; }
+        
+        /* Red segments (critical) */
+        .gauge-segment-9 { background-color: #ED8014; top: 9px; left: 36px; }
+        .gauge-segment-10 { background-color: #F26310; top: 13px; left: 40px; }
+        .gauge-segment-11 { background-color: #F5440D; top: 17px; left: 43px; }
+        .gauge-segment-12 { background-color: #F82509; top: 22px; left: 46px; }
+        .gauge-segment-13 { background-color: #FF0000; top: 27px; left: 48px; }
+
+        .logout-btn {
+            margin-top: 15px;
+            background-color: #f44336;
+        }
+
+        .logout-btn:hover {
+            background-color: #d32f2f;
+        }
+        
+        .timestamp {
+            font-size: 12px;
+            color: #666;
+            text-align: center;
+            margin-top: 10px;
+        }
+        
+        /* 모달 스타일 */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 10;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .modal {
+            background-color: white;
+            border-radius: 10px;
+            padding: 20px;
+            width: 300px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
+        
+        .modal-title {
+            font-size: 18px;
+            font-weight: bold;
+        }
+        
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+        }
+        
+        .modal-body {
+            margin-bottom: 20px;
+        }
+        
+        .modal-status {
+            display: flex;
+            justify-content: space-around;
+            margin: 15px 0;
+        }
+        
+        .status-indicator {
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 5px;
+        }
+        
+        .status-on {
+            background-color: #4CAF50;
+        }
+        
+        .status-off {
+            background-color: #f44336;
+        }
+        
+        .switch-container {
+            display: flex;
+            justify-content: center;
+            margin: 20px 0;
+        }
+        
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 34px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 34px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: #4CAF50;
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+        
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+        }
+        
+        .modal-btn {
+            padding: 8px 15px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-left: 10px;
+        }
+        
+        .modal-btn-cancel {
+            background-color: #f1f1f1;
+        }
+        
+        .modal-btn-save {
+            background-color: #4CAF50;
+            color: white;
+        }
+        
+        .panel-card {
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .panel-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 로그인 섹션 -->
+        <div id="login-section">
+            <h1>분전함 열화상 온도 모니터링</h1>
+            <div id="error-message"></div>
+            <div class="input-group">
+                <input type="text" id="username" placeholder="아이디">
+            </div>
+            <div class="input-group">
+                <input type="password" id="password" placeholder="비밀번호">
+            </div>
+            <button class="btn" onclick="login()">로그인</button>
+            <p style="font-size: 12px; color: #666; margin-top: 20px;">아이디: osfk2022008 / 비밀번호: 1234</p>
+        </div>
+
+        <!-- 대시보드 섹션 -->
+        <div id="dashboard">
+            <div class="dashboard-header">
+                <div class="logo">
+                    <div class="logo-circle">
+                        <div></div>
+                        <div></div>
+                        <div></div>
+                    </div>
+                    <span>메인 화면</span>
+                </div>
+            </div>
+
+            <div class="main-button">실시간 온도</div>
+
+            <div class="panels-grid" id="panels-grid">
+                <!-- 패널 내용은 JS로 동적 생성 -->
+            </div>
+            
+            <div class="timestamp" id="last-update"></div>
+            
+            <button class="btn" style="margin-top: 15px;" onclick="updateNow()">지금 업데이트</button>
+            <button class="btn logout-btn" onclick="logout()">로그아웃</button>
+        </div>
+        
+        <!-- 모달 창 -->
+        <div class="modal-overlay" id="modal-overlay">
+            <div class="modal">
+                <div class="modal-header">
+                    <div class="modal-title" id="modal-title">분전함 제어</div>
+                    <button class="modal-close" onclick="closeModal()">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p>선택한 분전함: <span id="selected-panel"></span></p>
+                    <p>현재 온도: <span id="panel-temp"></span></p>
+                    
+                    <div class="modal-status">
+                        <div>
+                            <span class="status-indicator status-on"></span> 작동 중
+                        </div>
+                        <div>
+                            <span class="status-indicator status-off"></span> 작동 중지
+                        </div>
+                    </div>
+                    
+                    <div class="switch-container">
+                        <label class="switch">
+                            <input type="checkbox" id="panel-switch">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <p style="text-align: center;" id="switch-status">OFF</p>
+                </div>
+                <div class="modal-footer">
+                    <button class="modal-btn modal-btn-cancel" onclick="closeModal()">취소</button>
+                    <button class="modal-btn modal-btn-save" onclick="savePanelSettings()">저장</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 로그인 자격 증명
+        const VALID_CREDENTIALS = {
+            id: 'osfk2022008',
+            password: '1234'
+        };
+
+        // 분전함 데이터 (실제 앱에서는 센서나 API에서 받아올 데이터)
+        let panelData = [
+            { 
+                id: 'panel-01', 
+                location: '분전함-01', 
+                temperature: 35.2,
+                active: true
+            },
+            { 
+                id: 'panel-02', 
+                location: '분전함-02', 
+                temperature: 42.7,
+                active: true
+            },
+            { 
+                id: 'panel-03', 
+                location: '분전함-03', 
+                temperature: 38.5,
+                active: true
+            },
+            { 
+                id: 'panel-04', 
+                location: '분전함-04', 
+                temperature: 51.3,
+                active: false
+            },
+            { 
+                id: 'panel-05', 
+                location: '분전함-05', 
+                temperature: 36.8,
+                active: true
+            },
+            { 
+                id: 'panel-06', 
+                location: '분전함-06', 
+                temperature: 46.4,
+                active: true
+            }
+        ];
+        
+        let updateInterval;
+
+        // 온도 상태 결정 함수
+        function getTemperatureStatus(temperature) {
+            if (temperature > 50) return 'critical';
+            if (temperature > 40) return 'warning';
+            return 'normal';
+        }
+        
+        // 온도에 따른 바늘 회전 각도 계산 함수
+        function calculateNeedleRotation(temperature) {
+            // 30도 ~ 60도 범위를 -90도 ~ 90도 회전 범위로 매핑
+            // -90도가 최저온도(30도), 0도가 중간온도(45도), 90도가 최고온도(60도)
+            const minTemp = 30;
+            const maxTemp = 60;
+            const minAngle = -90;
+            const maxAngle = 90;
+            
+            // 온도 제한 (범위를 벗어나지 않도록)
+            const limitedTemp = Math.max(minTemp, Math.min(maxTemp, temperature));
+            
+            // 선형 매핑 공식: (value - min1) * (max2 - min2) / (max1 - min1) + min2
+            return (limitedTemp - minTemp) * (maxAngle - minAngle) / (maxTemp - minTemp) + minAngle;
+        }
+
+        // 로그인 함수
+        function login() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const errorMessage = document.getElementById('error-message');
+
+            if (username === VALID_CREDENTIALS.id && password === VALID_CREDENTIALS.password) {
+                document.getElementById('login-section').style.display = 'none';
+                document.getElementById('dashboard').style.display = 'block';
+                errorMessage.textContent = '';
+                updateDashboard();
+                
+                // 실시간 데이터 시뮬레이션 시작
+                simulateRealTimeData();
+            } else {
+                errorMessage.textContent = '잘못된 ID 또는 비밀번호입니다.';
+            }
+        }
+
+        // 로그아웃 함수
+        function logout() {
+            document.getElementById('login-section').style.display = 'block';
+            document.getElementById('dashboard').style.display = 'none';
+            document.getElementById('username').value = '';
+            document.getElementById('password').value = '';
+            
+            // 업데이트 타이머 중지
+            clearInterval(updateInterval);
+        }
+        
+        // 지금 업데이트 버튼
+        function updateNow() {
+            updatePanelData();
+            updateDashboard();
+        }
+
+        // 대시보드 업데이트 함수
+        function updateDashboard() {
+            const panelsGrid = document.getElementById('panels-grid');
+            panelsGrid.innerHTML = ''; // 기존 내용 초기화
+
+            panelData.forEach(panel => {
+                const status = getTemperatureStatus(panel.temperature);
+                const panelElement = document.createElement('div');
+                panelElement.className = 'panel-card';
+                
+                panelElement.innerHTML = `
+                    <div class="panel-title">${panel.location}</div>
+                    <div class="temperature ${status}">${panel.temperature.toFixed(1)}°C</div>
+                    <div class="gauge">
+                        <div class="gauge-segments">
+                            <div class="gauge-segment gauge-segment-1"></div>
+                            <div class="gauge-segment gauge-segment-2"></div>
+                            <div class="gauge-segment gauge-segment-3"></div>
+                            <div class="gauge-segment gauge-segment-4"></div>
+                            <div class="gauge-segment gauge-segment-5"></div>
+                            <div class="gauge-segment gauge-segment-6"></div>
+                            <div class="gauge-segment gauge-segment-7"></div>
+                            <div class="gauge-segment gauge-segment-8"></div>
+                            <div class="gauge-segment gauge-segment-9"></div>
+                            <div class="gauge-segment gauge-segment-10"></div>
+                            <div class="gauge-segment gauge-segment-11"></div>
+                            <div class="gauge-segment gauge-segment-12"></div>
+                            <div class="gauge-segment gauge-segment-13"></div>
+                        </div>
+                        <div class="gauge-needle" style="transform: rotate(${calculateNeedleRotation(panel.temperature)}deg)"></div>
+                    </div>
+                `;
+                
+                // 패널 카드에 클릭 이벤트 추가
+                panelElement.addEventListener('click', function() {
+                    openModal(panel.id);
+                });
+                
+                panelsGrid.appendChild(panelElement);
+            });
+            
+            // 마지막 업데이트 시간 표시
+            const now = new Date();
+            const timeString = now.toLocaleTimeString('ko-KR');
+            document.getElementById('last-update').textContent = `마지막 업데이트: ${timeString}`;
+        }
+        
+        // 패널 데이터 업데이트
+        function updatePanelData() {
+            panelData = panelData.map(panel => {
+                // 활성 상태인 패널만 온도 업데이트
+                if (panel.active) {
+                    return {
+                        ...panel,
+                        temperature: 30 + Math.random() * 30 // 30~60도 사이 랜덤 생성
+                    };
+                }
+                return panel;
+            });
+        }
+        
+        // 모달 열기
+        function openModal(panelId) {
+            const panel = panelData.find(p => p.id === panelId);
+            if (!panel) return;
+            
+            document.getElementById('selected-panel').textContent = panel.location;
+            document.getElementById('panel-temp').textContent = panel.temperature.toFixed(1) + '°C';
+            
+            const switchEl = document.getElementById('panel-switch');
+            switchEl.checked = panel.active;
+            document.getElementById('switch-status').textContent = panel.active ? 'ON' : 'OFF';
+            
+            // 스위치 상태 변경 이벤트
+            switchEl.onchange = function() {
+                document.getElementById('switch-status').textContent = this.checked ? 'ON' : 'OFF';
+            };
+            
+            document.getElementById('modal-overlay').style.display = 'flex';
+        }
+        
+        // 모달 닫기
+        function closeModal() {
+            document.getElementById('modal-overlay').style.display = 'none';
+        }
+        
+        // 패널 설정 저장
+        function savePanelSettings() {
+            const panelLocation = document.getElementById('selected-panel').textContent;
+            const isActive = document.getElementById('panel-switch').checked;
+            
+            // 해당 패널 찾아서 active 상태 업데이트
+            const panelIndex = panelData.findIndex(p => p.location === panelLocation);
+            if (panelIndex !== -1) {
+                panelData[panelIndex].active = isActive;
+                
+                // 대시보드 업데이트
+                updateDashboard();
+                
+                // 모달 닫기
+                closeModal();
+            }
+        }
+        
+        // 실시간 데이터 시뮬레이션 함수
+        function simulateRealTimeData() {
+            // 처음 로딩 시에는 바로 업데이트 한 번
+            updatePanelData();
+            updateDashboard();
+            
+            // 이후 30초마다 업데이트 (원래 180000ms = 3분이었지만 데모를 위해 30초로 변경)
+            updateInterval = setInterval(() => {
+                updatePanelData();
+                updateDashboard();
+            }, 30000); 
+        }
+    </script>
+</body>
+</html>
